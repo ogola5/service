@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const bodyParser = require('body-parser');
 const http = require('http');
 const socketIo = require('socket.io');
 const connectDB = require('./config/db');
@@ -11,6 +10,7 @@ const jobRoutes = require('./routes/jobRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const errorHandler = require('./middlewares/errorHandler');
+const initializeSockets = require('./sockets'); // Socket.IO events
 
 // Connect to the database
 connectDB();
@@ -26,21 +26,20 @@ app.set('io', io);
 
 // Middlewares
 app.use(cors());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.json()); // Use built-in body parser
+app.use(express.urlencoded({ extended: true }));
 
-// Socket.IO Connection
-io.on('connection', (socket) => {
-  console.log('A user connected to Socket.IO');
-
-  socket.on('disconnect', () => {
-    console.log('A user disconnected from Socket.IO');
-  });
-});
+// Initialize Socket.IO Events
+initializeSockets(io);
 
 // Routes
 app.get('/', (req, res) => {
   res.send('Welcome to the Blue Collar Jobs API');
+});
+
+// Health Check Endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'Server is healthy', uptime: process.uptime() });
 });
 
 // API routes
@@ -52,6 +51,15 @@ app.use('/api/notifications', notificationRoutes);
 
 // Error Handling Middleware - this should be the last middleware
 app.use(errorHandler);
+
+// Graceful Shutdown
+process.on('SIGINT', async () => {
+  console.log('Server is shutting down...');
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
+});
 
 // Start Server
 const PORT = process.env.PORT || 5000;

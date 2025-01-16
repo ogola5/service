@@ -3,23 +3,27 @@ const User = require('../models/User');
 
 module.exports = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1]; // Assumes 'Bearer <token>'
+    // Extract the token from the Authorization header
+    const token = req.headers.authorization?.split(' ')[1]; // Format: "Bearer <token>"
 
     if (!token) {
       return res.status(401).json({ message: 'No token provided' });
     }
 
+    // Verify the token using the secret from the .env file
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decodedToken.userId);
+
+    // Find the user associated with the token
+    const user = await User.findById(decodedToken.id);
 
     if (!user) {
       return res.status(401).json({ message: 'User not found' });
     }
 
-    // Attach user to request object for later use in routes
-    req.user = { userId: user._id, role: user.role };
+    // Attach the user details to the request object for use in subsequent routes
+    req.user = { id: user._id, role: user.role, email: user.email };
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Authentication failed', error: error.message });
+    return res.status(401).json({ message: 'Authentication failed', error: error.message });
   }
 };
